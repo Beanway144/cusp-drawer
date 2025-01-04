@@ -1,6 +1,6 @@
 # Takes in a regina iso sig of geometric triangulation and 
 # outputs a drawing of the cusp
-from sage.all import arg, pi, real, imag, I, polygon, point, show
+from sage.all import arg, pi, real, imag, I, polygon, point, line, show
 import regina
 import snappy
 import matplotlib.pyplot as plt
@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 # test on noncusped, nonhyperbolic, consider number of cusps?
 # check + error message for weird edge case (figure8)
 # recongifure to be able to output many pics w/ names
-# make it easier to turn off and on printing vertices
-# !actually parse the edge data lol
+# !actually parse the edge data in a sane way
 
 pallet1 = ['coral', 'green', 'lightblue', 'gray', 'red', 'lightblue', 'pink', 'blueviolet', 'seashell', 'sienna', 'teal', 'thistle', 'peru']
 pallet2 = ["#EF476F", "#FFD166", "#06D6A0", "#118AB2", "#073B4C"]
@@ -26,11 +25,14 @@ test3 = 'fLAMcbccdeehhnaqw' # figure 8 sister geometric
 test4 = 'fLLQcacdedejbqqww' # isolated figure 8 1
 test5 = 'fLLQccecddehqrwwn' # isolated figure 8 2
 test6 = 'dLQbcccdegj' #failing!
-ISO_SIG = 'fLLQcacdedejbqqww'
+ISO_SIG = 'dLQacccjgnb'
+
+DRAW_VERTICES = False
+DRAW_EDGES = False
 
 
 def edge_of(d, shapes):
-	tet = int(d.detail()[0]) #very dumb!!
+	tet = int(d.detail()[0]) #very dumb!! parse this properly
 	v1 = int(d.detail()[3])
 	v2 = int(d.detail()[4])
 	z = shapes[tet]
@@ -78,8 +80,13 @@ def plot_complex_triangle(z1, z2, z3, color='blue', vertex_color='red'):
 	vertices.append(vertices[0])
 
 	triangle = polygon(vertices, fill=True, color=color, alpha=1)
-	# points = sum(point((z.real(), z.imag()), size=30, color='red') for z in [z1, z2, z3])
-	return triangle  #+ points
+	if DRAW_VERTICES:
+		triangle  += sum(point((z.real(), z.imag()), size=30, color='red') for z in [z1, z2, z3])
+	if DRAW_EDGES:
+		edge_lines = line(vertices, color='white', thickness=0.5)
+		triangle += edge_lines
+
+	return triangle
 
 # Current implementation fails and gives bad output on triangulations that have the pattern
 # around an edge v1, v2, v1. So we just give up in these cases...(how often does this happen?)
@@ -91,8 +98,8 @@ def checkFailure(triangulation_edges, sig):
 			k = (i+2) % len(edge_class)
 			if edge_class[i][0] == edge_class[k][0]:
 				if (edge_class[i][1] == edge_class[k][1]) or (edge_class[i][2] == edge_class[k][2]):
-					# print(f"The triangulation {sig} has a particular structure that this method can't work on." +
-					# 	" (v1,v2,v1 sequence) ")
+					print(f"The triangulation {sig} has a particular structure that this method can't work on." +
+						" (v1,v2,v1 sequence) ")
 					return True
 	return False
 
@@ -143,7 +150,6 @@ def draw(triangulation_edges, depth, output='output.png'):
 
 	# Points around first pass
 	# NOTE: prod always based at 0; adjust accordingly
-	# CLEANME? put positive+negative orientation into one case cleverly
 	while len(TODO) > 0:
 		offset, p1, (t1,v1), (t2,v2), (lastedgeclass, lht, lastedgei) = TODO[0]
 		TODO = TODO[1:]
@@ -175,146 +181,13 @@ def pp(edges):
 			print("      - Tetrahedron " + str(i[0]) + " with vertices " + str(i[1]) + " and " + str(i[2]) + " || Dihedral angle: " + str(round(float(arg(i[3]) * 180 / pi), 2)))
 
 def main():
-	# print("Getting shapes...")
-	# triangulation_edges = organize(ISO_SIG)
-	# if checkFailure(triangulation_edges, ISO_SIG): return
-	# pp(triangulation_edges)
-	# print("Drawing...")
-	# draw(triangulation_edges, 100)
+	print("Getting shapes...")
+	triangulation_edges = organize(ISO_SIG)
+	if checkFailure(triangulation_edges, ISO_SIG): return
+	pp(triangulation_edges)
+	print("Drawing...")
+	draw(triangulation_edges, 100, ISO_SIG+'.png')
 
-	print("Starting...")
-	fail_count = 0
-	k52 = ['dLQbcccdero',
-'fLLQcbcdeeelsfxxh',
-'eLPkbcddddcwrf',
-'eLAkbccddhhnqs',
-'eLPkbcdddmbkgo',
-'gvLQQcdefeffbokqrqm',
-'gLLAQbcdeeffhgjuubr',
-'fvPQccdedeeccjwfo',
-'fLLQcbeddeemqjvae',
-'fLLQcbcdeeemgoddp',
-'hLLLQkcdeefggglkeetwgw',
-'hvLAQkcdfgefggwnldbdas',
-'hvLAQkcdefgfggffbxdhuf',
-'hLLLQkcdffgegghslahrww',
-'hLLAAkbdedffgghravpraw',
-'gvLQQcdeffefjvgulbq',
-'gLLAQbddefffmkcdhgc',
-'gLLMQbddefffmvjmxbk',
-'gLLAQbeddfffmqjveof',
-'gLLPQcdefeffikdqhtk',
-'gLLPQcdefeffpgaquuf',
-'gLLAQbdeefffmkuedun',
-'iLvAAQcbfeegfghhhahaacvcw',
-'iLLLAQcceffgghhhphmaxgroo',
-'ivLAPQcdedfhghghsvwpamfco',
-'ivLLQQccdehfghghjsjhmegjj',
-'ivLAPQcdedfghhghbvcdlqrfg',
-'iLvLQQcaegefhghhjxgcjgkro',
-'iLLLMQcbedggfghhhhfhbgkww',
-'iLLLQMcbdeeffghhhrutdgoxj',
-'fLLQcbcdeeepjgpel',
-'hLLLQkcdeffggghstelwkv',
-'hLLAPkcddegfgghsvxswsw',
-'hLvAQkbefefgggpapmhlvv',
-'hLLLQkcdeefgggioiimwfr',
-'hLLPMkcdfeegggikmhhnsk',
-'hLLLQkcdfeeggghsipuncb',
-'hLLAMkbeddfgggmqjveqqa',
-'hLLLQkbdegffggmvqhtwgo',
-'hLLzQkcdegffggdgaliorr',
-'hvLAQkcedgffggfvjemxlj',
-'hLLLQkcdeegfggifheqfgo',
-'hLwLQkacefgfggngjgfkfv',
-'hLLLQkbcfegfggdjuemgjo',
-'hLvAQkbefegfggdadmxmvj',
-'hLLLQkbcegfgfgxbtaxojv',
-'hLLAPkbdeegfggmkueqnrb',
-'hLvAQkbeffgegghapiadoo',
-'iLLALQccddehghghhsvqqkeru',
-'iLLLAQccdgffghhhhshelftex',
-'iLLLAQccdgeehghhqoqihusat',
-'iLLvQQccegfhghghiqdainfjg',
-'iLLLAQcbdegfhghhmkadxioaq',
-'iLLLMQccceffghhhdwmprjwsw',
-'iLLPLQccdfeghhghqoxpojggc',
-'iLLLMQcbdeghfghhmkdafkock',
-'ivLLQQccgefhfhghwxbdxmxbr',
-'iLvLQQccefhgfghhiutatcfrb',
-'iLLLMQccedfghghhiifinvkjk',
-'iLLvQQccdehgfhghikhikfncn',
-'iLLLAQcccfegfhhhdwadufmlh',
-'iLLALQccddehhgghhsvxxmswi',
-'iLLLAQccdgeeghhhhshpuohlu',
-'iLLAMPcbeddfghhhmqjveqqfo',
-'iLLLPQcbdehfgghhmvqqwgovs',
-'ivLLQQccehgffghhwfaaapqvc',
-'iLLLMQcbdegfhghhmvltffooo',
-'iLLLPQcccehgfhghdwudvrocc',
-'iLLvQQccdefghghhdwqmgkvns',
-'iLLvQQccdhfgfhghpftaggwwo',
-'iLvLQQcbdfehgghhdftdkvvnk',
-'ivLLQQccdehfgghhwnkiterwg',
-'ivLLQQccegfhgfhhgfheiaigs',
-'ivLAMQccedfghhghwvkihacns',
-'iLvAAQcbfefgghhhmqdeafskc',
-'iLvAMQcadfehghghjaacmbanu',
-'iLwLMQcacgehfhghjgjgaoibe',
-'iLMvPQcacdfghhghjgqopeixv',
-'iLLPLQcbcefhghghxjmiksckg',
-'iLLLMQcbcfeghghherepkfnoo',
-'gLLMQbcdefffmrwmicw',
-'ivLAPQcdedfghhghrvsdaicvb',
-'iLLLMQcbceffhghhxjdmvrbjf',
-'iLLLMQcbcfgghfhhhfttjoskr',
-'iLLALQcbeddhgghhxxgoxjnpe',
-'iLvLQQcbfefhhgghxududvojo',
-'hLLLQkbdfegfggevthpfwo',
-'hvLAQkcdefgfggnwbmphpw',
-'hLLMAkbcdfefggmrwapcij',
-'gLLAQbddefffmkcuhjf',
-'iLLLQPccddegfghhigfmwjoiw',
-'ivLAMQcdefdghhghofawtawwg',
-'iLLLMQcbdfefhghhevthfnoso',
-'iLLLPQcbcfgfghhhlsmlgrjss',
-'ivLAMQccdfgghfhhboauehloc',
-'ivLLQQccdegfhhghkokaadrvk',
-'iLLvQQccdhegfhghloaprwwsv',
-'iLvwQQcadefhgghhjacvjvffn',
-'iLLMLQcacdefhghhnkacnumoc',
-'iLLMzQcacdeghhghnkacdhdts',
-'fLLQcbcdeeehnbdhl',
-'hLLLQkcdegffggqgmehrsf',
-'hLLAPkcdedgfggqkhcwjvw',
-'gLLMQbcdeffflsgatcj',
-'iLLLMQcbcgffhghhlsdlgjbss',
-'iLLLMQccdefhghghhsimokkkf',
-'iLLLPQccdfhghgghhfixgnccs',
-'iLLLQPcbdeffghhhmktievead',
-'iLLLMQccdfegfhhhhfiqgffbr',
-'iLLALQccdedhhgghqkhchuvwq',
-'hLLMAkbcdfefggpnbelftw',
-'hLvAQkbefegfggdaqpidvv',
-'iLwLMQcacgehfhghjgjspjmce',
-'iLLMPPcbddegfghhmkctvfbuw',
-'iLvwQQcadefhgghhjacbjckwf',
-'iLLMLQcacdefghhhnkacrpdns',
-'iLLMLQcbceffgghhmsxmbsfkk',
-'iLvLQQcbdfeghghhtnptwfgfo',
-'iLLzMQccdeghfghhtfmpwrsfs']
-	for i in range(119):
-		print(f"Starting triangulation {i}")
-		iso = k52[i]
-		# iso = snappy.OrientableCuspedCensus[i].isometry_signature()
-		# if snappy.Manifold(iso).num_cusps() == 1:
-		triangulation_edges = organize(iso)
-		if checkFailure(triangulation_edges, iso):
-			fail_count += 1
-			print(f"    - {i} failed")
-			continue
-		draw(triangulation_edges, 100, f'./52/{iso}.png')
-	print(f"Done! Failure count: {fail_count}")
 
 
 
