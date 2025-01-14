@@ -6,7 +6,6 @@ import snappy
 import matplotlib.pyplot as plt
 
 ###TODO
-# use python classes instead of nested lists
 # test on noncusped, nonhyperbolic, consider number of cusps?
 # check + error message for weird edge case (figure8)
 # recongifure to be able to output many pics w/ names
@@ -25,19 +24,40 @@ test6 = 'dLQbcccdegj' #failing!
 
 
 ##### PARAMETERS  #####
-ISO_SIG = 'fLLQccecddehqrwwn'
+ISO_SIG = test2
 pallet = purply
 DRAW_VERTICES = False
-DRAW_EDGES = False
+DRAW_EDGES = True
 
 #######################
 
+class Edge:
+	"""
+	A class that stores the information of a tetrahedron edge.
+	The tetrahedron number is the index of the tetrahedron in the
+	triangulation. Tail and head are the indices of respective 
+	vertices, and shape is the complex shape parameter, as a 
+	Sage complex number.
+	"""
+	def __init__(self, tetrahedron, tail, head, shape):
+		self.tetrahedron = tetrahedron
+		self.tail = tail 
+		self.head = head
+		self.shape = shape
+
+	def __str__(self):
+		return f"Tetrahedron {self.tetrahedron} ({self.tail} -> {self.head}), with parameter {self.shape}"
+
+	def get_vertex(self, ht):
+		if ht == 0:
+			return self.tail
+		else:
+			return self.head
 
 def edge_of(d, shapes):
 	"""
 	Given a Regina edge and a list of the triangulation's shapes,
-	parses the edge into a list 
-	(tetrahedron index, tail vertex, head vertex, edge parameter).
+	parses the edge into an Edge type.
 	"""
 	s_tet, s_edges = d.detail().split("(")
 	tet = int(s_tet)
@@ -51,17 +71,15 @@ def edge_of(d, shapes):
 			param = 1 / (1 - z)
 		case (0, 3) | (3, 0) | (1, 2) | (2, 1):
 			param = (z - 1) / z
-	return (tet, v1, v2, param)
+	return Edge(tet, v1, v2, param)
 
 
 def organize(sig):
 	"""
 	Organizes edge data into a table given isosig of a triangulation.
 
-	Output table is a doubly-nested list; each element of the output 
-	is a list representing an edge class. Each element of an edge class 
-	is an edge (ordered properly) taking the form 
-	[tetrahedron index, tail vertex, head vertex, shape parameter].
+	Output table is a list of list of edges. Each list is an edge-class,
+	containing, in order, Edge objects.
 	"""
 	triangulation_edges = []
 	T = regina.Triangulation3.fromIsoSig(sig)
@@ -100,8 +118,8 @@ def checkFailure(triangulation_edges, sig):
 		edge_class = triangulation_edges[edge_class_i]
 		for i in range(len(edge_class)):
 			k = (i+2) % len(edge_class)
-			if edge_class[i][0] == edge_class[k][0]:
-				if (edge_class[i][1] == edge_class[k][1]) or (edge_class[i][2] == edge_class[k][2]):
+			if edge_class[i].tetrahedron == edge_class[k].tetrahedron:
+				if (edge_class[i].tail == edge_class[k].tail) or (edge_class[i].head == edge_class[k].head):
 					print(f"The triangulation {sig} has a particular structure that this method can't work on." +
 						f" (v1,v2,v1 sequence at Edge Class {edge_class_i}, Edge {i})")
 					return True
@@ -109,84 +127,51 @@ def checkFailure(triangulation_edges, sig):
 
 
 def checkEdgeCase(t1, v1, t2, v2, last_edge_class_i, lht, last_edge_i, last_orientation, triangulation_edges):
+	"""
+	DEBUG -- FINDS BAD EDGE CASE
+	"""
 	edge_class = triangulation_edges[last_edge_class_i]
 	last_edge = edge_class[last_edge_i]
 	last_edge_minus_one = edge_class[(last_edge_i-1) % len(edge_class)]
 	last_edge_plus_two = edge_class[(last_edge_i+2) % len(edge_class)]
 
 	if last_orientation == -1:
-		if (last_edge[0], last_edge[lht+1]) == (t1,v1): # ..., [v1], v2, ...
-			if (last_edge_minus_one[0], last_edge_minus_one[lht+1]) == (t2, v2):
+		if (last_edge.tetrahedron, last_edge.get_vertex(lht)) == (t1,v1): # ..., [v1], v2, ...
+			if (last_edge_minus_one.tetrahedron, last_edge_minus_one.get_vertex(lht)) == (t2, v2):
 				print("-A")
 				return (True, (last_edge_class_i, last_edge_i, 1, lht)) 
-			if (last_edge_plus_two[0], last_edge_plus_two[lht+1]) == (t1, v1):
+			if (last_edge_plus_two.tetrahedron, last_edge_plus_two.get_vertex(lht)) == (t1, v1):
 				print("-B")
 				return (True, (last_edge_class_i, (last_edge_i + 2) % len(edge_class), 1, lht))
 
-		if (last_edge[0], last_edge[lht+1]) == (t2,v2): # ..., [v2], v1, ...
-			if (last_edge_minus_one[0], last_edge_minus_one[lht+1]) == (t1, v1):
+		if (last_edge.tetrahedron, last_edge.get_vertex(lht)) == (t2,v2): # ..., [v2], v1, ...
+			if (last_edge_minus_one.tetrahedron, last_edge_minus_one.get_vertex(lht)) == (t1, v1):
 				print("-C")
 				return (True, (last_edge_class_i, last_edge_i, 1, lht)) 
-			if (last_edge_plus_two[0], last_edge_plus_two[lht+1]) == (t2, v2):
+			if (last_edge_plus_two.tetrahedron, last_edge_plus_two.get_vertex(lht)) == (t2, v2):
 				print("-D")
 				return (True, (last_edge_class_i, (last_edge_i + 2) % len(edge_class), 1, lht))
 
 	last_edge_minus_two = edge_class[(last_edge_i-2) % len(edge_class)]
 	last_edge_plus_one = edge_class[(last_edge_i+1) % len(edge_class)]
 	if last_orientation == 1:
-		if (last_edge[0], last_edge[lht+1]) == (t1,v1): # ..., v2, [v1], ...
-			if (last_edge_plus_one[0], last_edge_plus_one[lht+1]) == (t2, v2):
+		if (last_edge.tetrahedron, last_edge.get_vertex(lht)) == (t1,v1): # ..., v2, [v1], ...
+			if (last_edge_plus_one.tetrahedron, last_edge_plus_one.get_vertex(lht)) == (t2, v2):
 				print("A")
 				return (True, (last_edge_class_i, last_edge_i, -1, lht)) 
-			if (last_edge_minus_two[0], last_edge_minus_two[lht+1]) == (t1, v1):
+			if (last_edge_minus_two.get_vertex, last_edge_minus_two.get_vertex(lht)) == (t1, v1):
 				print("B")
 				return (True, (last_edge_class_i, (last_edge_i - 1) % len(edge_class), -1, lht))
 
-		if (last_edge[0], last_edge[lht+1]) == (t2,v2): # ..., v1, [v2], ...
-			if (last_edge_plus_one[0], last_edge_plus_one[lht+1]) == (t1, v1):
+		if (last_edge.tetrahedron, last_edge.get_vertex(lht)) == (t2,v2): # ..., v1, [v2], ...
+			if (last_edge_plus_one.tetrahedron, last_edge_plus_one.get_vertex(lht)) == (t1, v1):
 				print("C")
 				return (True, (last_edge_class_i, last_edge_i, -1, lht)) 
-			if (last_edge_minus_two[0], last_edge_minus_two[lht+1]) == (t2, v2):
+			if (last_edge_minus_two.tetrahedron, last_edge_minus_two.get_vertex(lht)) == (t2, v2):
 				print("D")
 				return (True, (last_edge_class_i, (last_edge_i - 1) % len(edge_class), -1, lht))
 
 	return (False, 0)
-
-
-	# for edge_class_i in range(len(triangulation_edges)):
-	# 	edge_class = triangulation_edges[edge_class_i]
-	# 	for i in range(len(edge_class)):
-	# 		j = (i+1) % len(edge_class)
-	# 		k = (i+2) % len(edge_class)
-	# 		if edge_class[i][0] == edge_class[k][0]:
-	# 			if (edge_class[i][1] == edge_class[k][1]): #tails aba
-	# 				if (edge_class[i][0] == t1) and (edge_class[j][0] == t2): # t1,t2,t1
-	# 					if (edge_class[i][1] == v1) and (edge_class[j][1] == v2): #v1,v2,v1
-	# 						if last_orientation == 1:
-	# 							return (True, (edge_class_i, k, -1, 0))
-	# 						if last_orientation == -1:
-	# 							return (True, (edge_class_i, i, 1, 0))
-	# 				if (edge_class[i][0] == t2) and (edge_class[j][0] == t1): # t2,t1,t2
-	# 					if (edge_class[i][1] == v2) and (edge_class[j][1] == v1): #v2,v1,v2
-	# 						if last_orientation == 1:
-	# 							return (True, (edge_class_i, k, -1, 0))
-	# 						if last_orientation == -1:
-	# 							return (True, (edge_class_i, i, 1, 0))
-
-	# 			if (edge_class[i][2] == edge_class[k][2]): #heads aba
-	# 				if (edge_class[i][0] == t1) and (edge_class[j][0] == t2): # t1,t2,t1
-	# 					if (edge_class[i][2] == v1) and (edge_class[j][2] == v2): #v1,v2,v1
-	# 						if last_orientation == 1:
-	# 							return (True, (edge_class_i, k, -1, 1))
-	# 						if last_orientation == -1:
-	# 							return (True, (edge_class_i, i, 1, 1))
-	# 				if (edge_class[i][0] == t2) and (edge_class[j][0] == t1): # t2,t1,t2
-	# 					if (edge_class[i][2] == v2) and (edge_class[j][2] == v1): #v2,v1,v2
-	# 						if last_orientation == 1:
-	# 							return (True, (edge_class_i, k, -1, 1))
-	# 						if last_orientation == -1:
-	# 							return (True, (edge_class_i, i, 1, 1))
-	# return (False, 0)
 
 def findSequence(t1, v1, t2, v2, last_edge_class_i, lht, last_edge_i, last_orientation, triangulation_edges):
 	"""
@@ -209,11 +194,13 @@ def findSequence(t1, v1, t2, v2, last_edge_class_i, lht, last_edge_i, last_orien
 	# handle edge case v,w,v
 	(tf, ret) = checkEdgeCase(t1, v1, t2, v2, last_edge_class_i, lht, last_edge_i, last_orientation, triangulation_edges)
 	if tf:
-		oli, ol, oo, oht = ret
-		print(f'Input:\n' +
-			f'    > T{t1}V{v1} and T{t2}V{v2} at {last_edge_i} going {last_orientation}.\n' +
-			f'Ret:\n' + f'	- Continue from {oli}:{ol}, going {oo}.')
-		return ret
+		# oli, ol, oo, oht = ret
+		# print(f'Input:\n' +
+		# 	f'    > T{t1}V{v1} and T{t2}V{v2} at {last_edge_i} going {last_orientation}.\n' +
+		# 	f'Ret:\n' + f'	- Continue from {oli}:{ol}, going {oo}.')
+		# return ret
+		print("Reached failure edge case, see README. Exiting...")
+		exit()
 
 	for edge_class_i in range(len(triangulation_edges)):
 		edge_class = triangulation_edges[edge_class_i]
@@ -221,8 +208,8 @@ def findSequence(t1, v1, t2, v2, last_edge_class_i, lht, last_edge_i, last_orien
 			j = (i+1) % len(edge_class)
 			k = (i+2) % len(edge_class)
 			h = (i-1) % len(edge_class)
-			(tt1, tv1, tt2, tv2) = (edge_class[i][0], edge_class[i][1], edge_class[j][0], edge_class[j][1]) #tail
-			(ht1, hv1, ht2, hv2) = (edge_class[i][0], edge_class[i][2], edge_class[j][0], edge_class[j][2]) #head
+			(tt1, tv1, tt2, tv2) = (edge_class[i].tetrahedron, edge_class[i].tail, edge_class[j].tetrahedron, edge_class[j].tail) #tail
+			(ht1, hv1, ht2, hv2) = (edge_class[i].tetrahedron, edge_class[i].head, edge_class[j].tetrahedron, edge_class[j].head) #head
 			if (last_edge_i not in [i,j,k,h]) or (lht == 1) or (last_edge_class_i != edge_class_i): # tails
 				if (tt1, tv1, tt2, tv2) == (t1, v1, t2, v2):
 					return (edge_class_i, i, 1, 0)
@@ -247,14 +234,16 @@ def draw(triangulation_edges, depth, output='output.png'):
 	# First pass around origin
 	TODO = []
 	edge0 = triangulation_edges[0]
-	pl = plot_complex_triangle(0+0*I, 1+0*I, edge0[0][3], pallet[edge0[0][0]])
-	TODO.append((1+0*I, edge0[0][3], (edge0[0][0], edge0[0][1]), (edge0[-1][0], edge0[-1][1]), (0, 0, 0, 1)))
-	prod = edge0[0][3]
+	pl = plot_complex_triangle(0+0*I, 1+0*I, edge0[0].shape, pallet[edge0[0].tetrahedron])
+	TODO.append((1+0*I, edge0[0].shape, (edge0[0].tetrahedron, edge0[0].tail), 
+		(edge0[-1].tetrahedron, edge0[-1].tail), (0, 0, 0, 1)))
+	prod = edge0[0].shape
 	for e in range(1, len(edge0)):
-		pl += plot_complex_triangle(0+0*I, prod, edge0[e][3]*prod, pallet[edge0[e][0]])
+		pl += plot_complex_triangle(0+0*I, prod, edge0[e].shape * prod, pallet[edge0[e].tetrahedron])
 		if e < 3:
-			TODO.append((prod, edge0[e][3]*prod, (edge0[e][0], edge0[e][1]), (edge0[e-1][0], edge0[e-1][1]), (0, 0, e, 1)))
-		prod *= edge0[e][3]
+			TODO.append((prod, edge0[e].shape * prod, (edge0[e].tetrahedron, edge0[e].tail), 
+				(edge0[e-1].tetrahedron, edge0[e-1].tail), (0, 0, e, 1)))
+		prod *= edge0[e].shape
 
 
 	# Points around first pass
@@ -265,19 +254,19 @@ def draw(triangulation_edges, depth, output='output.png'):
 		edge_class_i, edge, orientation, ht = findSequence(t1, v1, t2, v2, lastedgeclass, lht, lastedgei, lastorientation, triangulation_edges)
 		edge_class = triangulation_edges[edge_class_i]
 		current_edge_degree = len(edge_class)
-		pl += plot_complex_triangle(offset, p1, (p1-offset)*edge_class[edge][3] + offset, pallet[edge_class[edge][0]])
-		prod = (p1 - offset)*edge_class[edge][3]
+		pl += plot_complex_triangle(offset, p1, (p1-offset)*edge_class[edge].shape + offset, pallet[edge_class[edge].tetrahedron])
+		prod = (p1 - offset)*edge_class[edge].shape
 		for i in range(1, current_edge_degree):
 			ce = (edge + (i * orientation)) % current_edge_degree        #current edge
 			le = (edge + (i - 1) * orientation) % current_edge_degree    #last edge
-			pl += plot_complex_triangle(offset, prod+offset, edge_class[ce][3]*prod + offset, pallet[edge_class[ce][0]])
+			pl += plot_complex_triangle(offset, prod+offset, edge_class[ce].shape*prod + offset, pallet[edge_class[ce].tetrahedron])
 			if depth > 0: #don't add anymore 
-				(TODO.append((prod + offset, edge_class[ce][3]*prod + offset, 
-					(edge_class[ce][0], edge_class[ce][ht+1]),
-			 		(edge_class[le][0], edge_class[le][ht+1]), 
+				(TODO.append((prod + offset, edge_class[ce].shape*prod + offset, 
+					(edge_class[ce].tetrahedron, edge_class[ce].get_vertex(ht)),
+			 		(edge_class[le].tetrahedron, edge_class[le].get_vertex(ht)), 
 			 		(edge_class_i, ht, ce, orientation))))
 				depth -= 1
-			prod *= edge_class[ce][3]
+			prod *= edge_class[ce].shape
 		
 
 	pl.save(output, dpi=600, axes=False)
@@ -287,14 +276,13 @@ def pp(edges):
 	for e in range(len(edges)):
 		print(">>> Edge " + str(e) + ": ")
 		for i in edges[e]:
-			print("      - Tetrahedron " + str(i[0]) + " with vertices " + str(i[1]) + " and " + str(i[2]) + " || Dihedral angle: " + str(round(float(arg(i[3]) * 180 / pi), 2)))
+			print("      - Tetrahedron " + str(i.tetrahedron) + " with vertices " + str(i.tail) + " and " + str(i.head) + " || Dihedral angle: " + str(round(float(arg(i.shape) * 180 / pi), 2)))
 
 def main():
 	print("Getting shapes...")
 	triangulation_edges = organize(ISO_SIG)
 	pp(triangulation_edges)
-	# if checkFailure(triangulation_edges, ISO_SIG): return
-	
+	if checkFailure(triangulation_edges, ISO_SIG): return
 	print("Drawing...")
 	draw(triangulation_edges, 100, ISO_SIG+'.png')
 
